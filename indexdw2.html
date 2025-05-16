@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>MathML Menclose Fixer with ZIP Download</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; }
+  .log { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px; }
+  .file-log { margin-bottom: 10px; }
+  input[type="file"] { margin-bottom: 10px; }
+  button { margin-left: 10px; }
+</style>
+</head>
+<body>
+  <h1>MathML Menclose Fixer with ZIP Download</h1>
+  <input type="file" id="fileInput" webkitdirectory directory multiple />
+  <button onclick="processFiles()">Fix Files & Download ZIP</button>
+  <div class="log" id="log"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    function fixMathML(content) {
+      return content.replace(
+        /<menclose[^>]*notation="bottom"[^>]*>[\s\S]*?<mn>(\d+)<\/mn>[\s\S]*?<mo>([+\u2212-])<\/mo>[\s\S]*?<mn>(\d+)<\/mn>[\s\S]*?<\/menclose>/g,
+        (match, num1, operator, num2) => {
+          const cleanOp = operator === '\u2212' ? '-' : operator;
+          return `<mn>${num1}</mn><mo>${cleanOp}</mo><mn>${num2}</mn><mo>=</mo><mtext>blank</mtext>`;
+        }
+      );
+    }
+
+    async function processFiles() {
+      const input = document.getElementById('fileInput');
+      const log = document.getElementById('log');
+      log.innerHTML = '';
+
+      if (!input.files.length) {
+        log.innerHTML = '<p>Please select a folder first.</p>';
+        return;
+      }
+
+      const zip = new JSZip();
+      let fixedCount = 0;
+
+      const filesArray = Array.from(input.files).filter(file =>
+        file.name.endsWith('.xhtml') || file.name.endsWith('.html')
+      );
+
+      for (const file of filesArray) {
+        const content = await file.text();
+        const fixedContent = fixMathML(content);
+
+        const fileLog = document.createElement('div');
+        fileLog.className = 'file-log';
+
+        if (content !== fixedContent) {
+          fixedCount++;
+          zip.file(file.webkitRelativePath, fixedContent);
+          fileLog.textContent = `Fixed and added to ZIP: ${file.name}`;
+          fileLog.style.color = 'green';
+        } else {
+          fileLog.textContent = `No changes in: ${file.name}`;
+          fileLog.style.color = 'gray';
+        }
+        log.appendChild(fileLog);
+      }
+
+      if (fixedCount > 0) {
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'fixed_files.zip';
+        link.textContent = `Download ZIP with ${fixedCount} fixed file(s)`;
+        link.style.display = 'block';
+        link.style.marginTop = '20px';
+        log.appendChild(link);
+      } else {
+        const noChangeMsg = document.createElement('p');
+        noChangeMsg.textContent = 'No files needed fixing.';
+        log.appendChild(noChangeMsg);
+      }
+    }
+  </script>
+</body>
+</html>
